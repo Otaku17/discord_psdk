@@ -22,6 +22,8 @@ No runtime setup needed — everything is loaded from config files.
 
 ## Installation
 
+Download the latest version of the plugin [release](https://github.com/Otaku17/discord_psdk/releases)
+
 1. Place the plugin in your project/scripts:
 
    ```
@@ -120,7 +122,7 @@ Embeds are built using a fluent, chainable DSL.
 ```ruby
 embed = Discord::Webhook.embed
   .title("Choice of starter")
-  .description("Choice of starter")
+  .description("The player <player_name> has just chosen Squirtle.")
   .color("#5865F2")
   .field("Zone", "Laboratory", inline: true)
   .footer("<YOUR_GAME_NAME>")
