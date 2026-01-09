@@ -47,7 +47,6 @@ No runtime setup needed — everything is loaded from config files.
    ```
 
 Here’s an example of a typical Rich Presence activity setup:
-![Discord Rich Presence Example](assets/setup_rich_presence.mp4)
 
 ---
 
