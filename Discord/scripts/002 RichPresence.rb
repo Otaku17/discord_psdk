@@ -1,5 +1,3 @@
-require "json"
-
 module Discord
   module RichPresence
     module_function
@@ -271,15 +269,21 @@ module Discord
     # @raise [RuntimeError] if IPC not found
     def connect
       ipc_paths.each do |path|
+        next unless File.exist?(path)
+
         begin
-          socket = File.open(path, "r+b")
-          socket.sync = true
-          return socket
+          case RUBY_PLATFORM
+          when /mswin|mingw|cygwin/
+            return File.open(path, "r+b")
+          when /linux|darwin/
+            return UNIXSocket.new(path)
+          end
         rescue
+          next
         end
       end
 
-      raise "Discord IPC not found"
+      return nil
     end
 
     # List IPC paths by platform.
@@ -289,22 +293,20 @@ module Discord
       case RUBY_PLATFORM
       when /mswin|mingw|cygwin/
         (0..9).map { |i| "\\\\.\\pipe\\discord-ipc-#{i}" }
-
       when /linux/
         uid = Process.uid
         paths = (0..9).map { |i| "/run/user/#{uid}/discord-ipc-#{i}" }
 
         if ENV["XDG_RUNTIME_DIR"]
-          paths += (0..9).map { |i| "#{ENV["XDG_RUNTIME_DIR"]}/discord-ipc-#{i}" }
+        paths += (0..9).map { |i| "#{ENV["XDG_RUNTIME_DIR"]}/discord-ipc-#{i}" }
         end
 
-        paths
-
+        return paths
       when /darwin/
-        (0..9).map { |i| "/tmp/discord-ipc-#{i}" }
-
+        tmp = ENV["TMPDIR"] || "/tmp"
+        (0..9).map { |i| File.join(tmp, "discord-ipc-#{i}") }
       else
-        []
+        return []
       end
     end
 
