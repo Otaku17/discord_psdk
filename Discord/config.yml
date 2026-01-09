@@ -1,0 +1,9 @@
+---
+!ruby/object:PluginManager::Config
+name: Discord
+author:
+  - Ota
+version: 0.0.1
+deps: []
+added_files:
+  - Data/configs/discord_config.json

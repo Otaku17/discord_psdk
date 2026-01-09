@@ -1,0 +1,2 @@
+module Discord
+end
