@@ -38,13 +38,16 @@ No runtime setup needed — everything is loaded from config files.
    ```json
    {
      "client_id": "YOUR_DISCORD_APP_ID",
-     "details": "Playing the game",
-     "state": "Main Menu",
-     "large_image": "game_logo",
-     "small_image": "game_logo",
-     "webhook_url": "https://discord.com/api/webhooks/..."
+     "details": "Placeholder details",
+     "state": "Placeholder state",
+     "large_image": "large",
+     "small_image": "small",
+     "webhook_url": "YOUR_DISCORD_WEBHOOK_URL"
    }
    ```
+
+Here’s an example of a typical Rich Presence activity setup:
+![Discord Rich Presence Example](assets/setup_rich_presence.mp4)
 
 ---
 
@@ -75,10 +78,10 @@ Discord::RichPresence.resume
 ```ruby
 Discord::RichPresence.update(
   details: "In battle",
-  state: "Arena",
+  state: "Second champions",
   assets: {
-    large_image: "arena",
-    small_image: "player"
+    large_image: "arena_second",
+    small_image: "champion_second"
   }
 )
 ```
@@ -103,7 +106,7 @@ Discord::RichPresence.stop
 
 ```ruby
 Discord::Webhook.send(
-  content: "Server is online!"
+  content: "A new player has just begun their adventure."
 )
 ```
 
@@ -113,12 +116,11 @@ Embeds are built using a fluent, chainable DSL.
 
 ```ruby
 embed = Discord::Webhook.embed
-  .title("Server Status")
-  .description("Live game server information")
+  .title("Choice of starter")
+  .description("Choice of starter")
   .color("#5865F2")
-  .field("Players", "12 / 64", inline: true)
-  .field("Map", "Arena", inline: true)
-  .footer("My Game")
+  .field("Zone", "Laboratory", inline: true)
+  .footer("<YOUR_GAME_NAME>")
   .timestamp
 ```
 
