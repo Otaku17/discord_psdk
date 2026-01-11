@@ -3,7 +3,7 @@
 name: Discord
 author:
   - Ota
-version: 0.0.2
+version: 1.0.0
 deps: []
 added_files:
   - Data/configs/discord_config.json
