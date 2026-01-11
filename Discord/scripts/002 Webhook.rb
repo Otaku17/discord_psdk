@@ -24,7 +24,8 @@ module Discord
       content: nil,
       username: nil,
       avatar_url: nil,
-      embeds: nil
+      embeds: nil,
+      silent: true
     )
       uri = URI.parse(url)
 
@@ -36,12 +37,19 @@ module Discord
 
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == "https"
+      http.open_timeout = 3
+      http.read_timeout = 5
 
       request = Net::HTTP::Post.new(uri.request_uri)
       request["Content-Type"] = "application/json"
       request.body = payload.to_json
 
       http.request(request)
+
+    rescue StandardError => e
+      raise e unless silent
+      warn "[Discord::Webhook] skipped (#{e.class})"
+      nil
     end
 
     # Create an embed builder.
