@@ -269,8 +269,10 @@ module Discord
     # @raise [RuntimeError] if IPC not found
     def connect
       ipc_paths.each do |path|
-        next unless File.exist?(path)
-
+        socket = File.open(path, "r+b")
+        socket.sync = true
+        return socket
+        
         begin
           case RUBY_PLATFORM
           when /mswin|mingw|cygwin/
