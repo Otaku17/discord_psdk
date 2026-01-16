@@ -1,24 +1,45 @@
-require "json"
-require "net/http"
-require "uri"
-require "time"
-
 module Discord
   module Webhook
     module_function
 
-    # Send a Discord webhook message.
+    # =========================
+    # Utils
+    # =========================
+
+    # Remove nil values recursively from a Hash or Array.
     #
-    # @param url [String]
-    #   Webhook URL
+    # @param obj [Object] The object to compact.
+    # @return [Object] The cleaned object without nil values.
+    def compact_hash(obj)
+      case obj
+      when Hash
+        obj.each_with_object({}) do |(k, v), h|
+          next if v.nil?
+          cleaned = compact_hash(v)
+          h[k] = cleaned unless cleaned.nil?
+        end
+      when Array
+        obj.map { |v| compact_hash(v) }.compact
+      when String
+        sanitize_mentions(obj)
+      else
+        obj
+      end
+    end
+
+    # =========================
+    # Webhook Sender
+    # =========================
+
+    # Send a message to a Discord webhook.
     #
-    # @param content [String, nil]
-    #   Plain text message
-    #
-    # @param embeds [Array<Hash>, nil]
-    #   Embed payloads (EmbedBuilder#to_h)
-    #
-    # @return [Net::HTTPResponse]
+    # @param url [String] The webhook URL.
+    # @param content [String, nil] The message content.
+    # @param username [String, nil] Override the webhook username.
+    # @param avatar_url [String, nil] Override the webhook avatar.
+    # @param embeds [Array, nil] List of embed hashes.
+    # @param silent [Boolean] Suppress errors if true.
+    # @return [Net::HTTPResponse, nil] The HTTP response or nil if silent.
     def send(
       url: Configs.discord.webhook_url,
       content: nil,
@@ -30,10 +51,10 @@ module Discord
       uri = URI.parse(url)
 
       payload = {}
-      payload[:content]    = content    if content
-      payload[:username]   = username   if username
+      payload[:content]    = sanitize_mentions(content)    if content
+      payload[:username]   = sanitize_mentions(username)   if username
       payload[:avatar_url] = avatar_url if avatar_url
-      payload[:embeds]     = embeds     if embeds
+      payload[:embeds]     = embeds if embeds
 
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == "https"
@@ -52,7 +73,7 @@ module Discord
       nil
     end
 
-    # Create an embed builder.
+    # Return a new EmbedBuilder instance.
     #
     # @return [EmbedBuilder]
     def embed
@@ -60,45 +81,88 @@ module Discord
     end
 
     # =========================
-    # Embed Builder DSL
+    # Embed Builder
     # =========================
+
     class EmbedBuilder
+      # Initialize an empty embed with default config values.
+      #
+      # @return [void]
       def initialize
-        @embed = { fields: [] }
+        @embed = {
+          title:       Configs.discord.title,
+          url:         Configs.discord.url,
+          description: Configs.discord.description,
+          color:       parse_color(Configs.discord.color),
+          fields:      [],
+          author: {
+            name:     Configs.discord.author_name,
+            icon_url: Configs.discord.author_icon,
+            url:       Configs.discord.author_url
+          },
+          thumbnail: {
+            url: Configs.discord.thumbnail
+          },
+          image: {
+            url: Configs.discord.image
+          },
+          footer: {
+            text:     Configs.discord.footer_text,
+            icon_url: Configs.discord.footer_icon
+          }
+        }
       end
 
-      # @param value [String]
-      # @return [EmbedBuilder]
+      # =========================
+      # Basic fields
+      # =========================
+
+      # Set the embed title.
+      #
+      # @param value [String] The title text.
+      # @return [self]
       def title(value)
         @embed[:title] = value
         self
       end
 
-      # @param value [String]
-      # @return [EmbedBuilder]
-      def description(value)
-        @embed[:description] = value
-        self
-      end
-
-      # @param value [Integer, String]
-      # @return [EmbedBuilder]
-      def color(value)
-        @embed[:color] = parse_color(value)
-        self
-      end
-
-      # @param value [String]
-      # @return [EmbedBuilder]
+      # Set the embed URL.
+      #
+      # @param value [String] The URL.
+      # @return [self]
       def url(value)
         @embed[:url] = value
         self
       end
 
-      # @param name [String]
-      # @param value [String]
-      # @param inline [Boolean]
-      # @return [EmbedBuilder]
+      # Set the embed description.
+      #
+      # @param value [String] The description text.
+      # @return [self]
+      def description(value)
+        @embed[:description] = value
+        self
+      end
+
+      # Set the embed color.
+      #
+      # @param value [Integer, String] The color as integer or hex string.
+      # @return [self]
+      def color(value)
+        @embed[:color] = parse_color(value)
+        self
+      end
+
+      # =========================
+      # Rich fields
+      # =========================
+
+      # Add a field to the embed.
+      #
+      # @param name [String] Field name.
+      # @param value [String] Field value.
+      # @param inline [Boolean] Whether field is inline.
+      # @return [self]
       def field(name, value, inline: false)
         @embed[:fields] << {
           name: name.to_s,
@@ -108,54 +172,93 @@ module Discord
         self
       end
 
-      # @return [EmbedBuilder]
-      def footer(text, icon_url: nil)
-        @embed[:footer] = { text: text }
-        @embed[:footer][:icon_url] = icon_url if icon_url
+      # Set the embed footer.
+      #
+      # @param text [String, nil] Footer text.
+      # @param icon_url [String, nil] Footer icon URL.
+      # @return [self]
+      def footer(text = nil, icon_url: nil)
+        @embed[:footer] ||= {}
+        @embed[:footer][:text] = text unless text.nil?
+        @embed[:footer][:icon_url] = icon_url unless icon_url.nil?
         self
       end
 
-      # @return [EmbedBuilder]
-      def author(name, icon_url: nil, url: nil)
-        @embed[:author] = { name: name }
-        @embed[:author][:icon_url] = icon_url if icon_url
-        @embed[:author][:url]      = url if url
+      # Set the embed author.
+      #
+      # @param name [String, nil] Author name.
+      # @param icon_url [String, nil] Author icon URL.
+      # @param url [String, nil] Author URL.
+      # @return [self]
+      def author(name = nil, icon_url: nil, url: nil)
+        @embed[:author] ||= {}
+        @embed[:author][:name] = name unless name.nil?
+        @embed[:author][:icon_url] = icon_url unless icon_url.nil?
+        @embed[:author][:url] = url unless url.nil?
         self
       end
 
-      # @return [EmbedBuilder]
-      def thumbnail(url)
-        @embed[:thumbnail] = { url: url }
+      # Set the embed thumbnail.
+      #
+      # @param url [String, nil] Thumbnail URL.
+      # @return [self]
+      def thumbnail(url = nil)
+        @embed[:thumbnail] ||= {}
+        @embed[:thumbnail][:url] = url unless url.nil?
         self
       end
 
-      # @return [EmbedBuilder]
-      def image(url)
-        @embed[:image] = { url: url }
+      # Set the embed image.
+      #
+      # @param url [String, nil] Image URL.
+      # @return [self]
+      def image(url = nil)
+        @embed[:image] ||= {}
+        @embed[:image][:url] = url unless url.nil?
         self
       end
 
-      # @param time [Time]
-      # @return [EmbedBuilder]
+      # Set the embed timestamp.
+      #
+      # @param time [Time] Timestamp to set (default: now).
+      # @return [self]
       def timestamp(time = Time.now)
         @embed[:timestamp] = time.utc.iso8601
         self
       end
 
-      # Convert to Discord-compatible hash.
+      # =========================
+      # Final payload
+      # =========================
+
+      # Convert the embed to a Discord-compatible hash.
       #
       # @return [Hash]
       def to_h
-        data = @embed.dup
-        data.delete(:fields) if data[:fields].empty?
+        data = Discord::Webhook.compact_hash(@embed)
+        data.delete(:fields) if data[:fields]&.empty?
         data
       end
 
       private
 
+      # Parse a color string or integer to integer.
+      #
+      # @param value [Integer, String, nil] The color.
+      # @return [Integer, nil]
       def parse_color(value)
+        return if value.nil?
         return value if value.is_a?(Integer)
-        value.delete("#").to_i(16)
+        value.to_s.delete("#").to_i(16)
+      end
+
+      # Prevent Discord mentions (@everyone, roles, users) in a string.
+      #
+      # @param value [String] The string to sanitize.
+      # @return [String]
+      def sanitize_mentions(value)
+        return value unless value.is_a?(String)
+        value.gsub("@", "")
       end
     end
   end

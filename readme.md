@@ -2,27 +2,9 @@
 
 > Discord integration for Ruby / Pokémon SDK projects  
 > Rich Presence (IPC) + Webhook (HTTP) with a clean DSL
-
-## Overview
-
-This module provides a **full Discord integration** for PSDK projects:
-
-- **Discord Rich Presence**
-  - Native IPC (Windows / Linux / macOS)
-  - Background thread (non-blocking)
-  - Pause / Resume / Dynamic updates
-- **Discord Webhook**
-  - Simple message sending
-  - Fluent DSL for building Discord embeds
-  - Official Discord API compatible
-
-No runtime setup needed — everything is loaded from config files.
-
 ---
 
-## Installation
-
-Download the latest version of the plugin [release](https://github.com/Otaku17/discord_psdk/releases)
+## Installation / Update
 
 1. Place the plugin in your project/scripts:
 
@@ -37,95 +19,100 @@ Download the latest version of the plugin [release](https://github.com/Otaku17/d
    ```
 
 3. Configure Discord settings (`Data/configs/discord_config.json`).
-   ```json
-   {
-     "client_id": "YOUR_DISCORD_APP_ID",
-     "details": "Placeholder details",
-     "state": "Placeholder state",
-     "large_image": "large",
-     "small_image": "small",
-     "webhook_url": "YOUR_DISCORD_WEBHOOK_URL"
-   }
-   ```
 
 Here’s an example of a typical Rich Presence activity setup:
 
 
 https://github.com/user-attachments/assets/c5ce840a-53da-43a9-8ebd-f264980f13f0
 
-
----
-
-## Discord Rich Presence
-
-### Start Rich Presence
+## Start Rich Presence
 
 ```ruby
 Discord::RichPresence.start
 ```
 
-- Non-blocking
-- Safe to call multiple times
-- Automatically connects to Discord
+| Field | Required | Description |
+|------|---------|-------------|
+| client_id | ✅ | Discord Application ID |
 
-### Pause / Resume
+
+
+## Update Activity
+
+```ruby
+Discord::RichPresence.update(
+  details: "In battle",
+  state: "Arena",
+  assets: {
+    large_image: "arena",
+    small_image: "player"
+  }
+)
+```
+
+### Activity Object (Official)
+
+| Field | Required | Type | Notes |
+|-----|---------|------|------|
+| details | ❌ | String | Max 128 chars |
+| state | ❌ | String | Max 128 chars |
+| timestamps.start | ❌ | Integer | Unix timestamp |
+| assets.large_image | ❌ | String | Asset key |
+| assets.large_text | ❌ | String | Hover text |
+| assets.small_image | ❌ | String | Asset key |
+| assets.small_text | ❌ | String | Hover text |
+
+> Only provided fields are sent. `nil` removes the field.
+
+
+## Pause / Resume
 
 ```ruby
 Discord::RichPresence.pause
 Discord::RichPresence.resume
 ```
 
-- `pause` hides the activity
-- `resume` restores the previous one
+| Method | Effect |
+|------|-------|
+| pause | Clears activity |
+| resume | Restores last activity |
 
-### Update Activity
 
-```ruby
-Discord::RichPresence.update(
-  details: "In battle",
-  state: "Second champions",
-  assets: {
-    large_image: "arena_second",
-    small_image: "champion_second"
-  }
-)
-```
-
-Only provided fields are updated.
-
-### Stop Rich Presence
+## Stop Rich Presence
 
 ```ruby
 Discord::RichPresence.stop
 ```
 
-- Clears activity
-- Closes IPC connection
+- Closes IPC socket
 - Stops background thread
 
----
 
-## Discord Webhook
+# DISCORD WEBHOOK API
 
-### Send a simple message
+Based on **official Discord Webhook & Embed API**.
+
+## Send Message
 
 ```ruby
-Discord::Webhook.send(
-  content: "A new player has just begun their adventure."
-)
+Discord::Webhook.send(content: "Server online")
 ```
 
-### Embed DSL
+| Field | Required | Type |
+|------|---------|------|
+| webhook_url | ✅ | String |
+| content | ❌ | String |
+| username | ❌ | String |
+| avatar_url | ❌ | String |
+| embeds | ❌ | Array<Embed> |
 
-Embeds are built using a fluent, chainable DSL.
+## Embed Builder DSL
 
 ```ruby
 embed = Discord::Webhook.embed
-  .title("Choice of starter")
-  .description("The player <player_name> has just chosen Squirtle.")
+  .title("Status")
+  .description("Server running")
   .color("#5865F2")
-  .field("Zone", "Laboratory", inline: true)
-  .footer("<YOUR_GAME_NAME>")
   .timestamp
 ```
 
@@ -137,6 +124,53 @@ Discord::Webhook.send(
 )
 ```
 
+## Embed Object (Official Discord API)
+
+| Field | Required | Type | Limits |
+|------|---------|------|--------|
+| title | ❌ | String | 256 chars |
+| description | ❌ | String | 4096 chars |
+| url | ❌ | String | Valid URL |
+| timestamp | ❌ | ISO8601 | |
+| color | ❌ | String | HEX |
+
+### Author Object
+
+| Field | Required | Type |
+|------|---------|------|
+| name | ❌ | String |
+| url | ❌ | String |
+| icon_url | ❌ | String |
+
+### Footer Object
+
+| Field | Required | Type |
+|------|---------|------|
+| text | ❌ | String |
+| icon_url | ❌ | String |
+
+### Image / Thumbnail
+
+| Field | Required | Type |
+|------|---------|------|
+| url | ❌ | String |
+
+### Fields Array
+
+| Field | Required | Type | Limits |
+|------|---------|------|--------|
+| name | ✅ | String | 256 chars |
+| value | ✅ | String | 1024 chars |
+| inline | ❌ | Boolean | |
+
+
+## Limits (Discord Enforced)
+
+- Max embeds per message: **10**
+- Max fields per embed: **25**
+- Total embed size: **6000 chars**
+
+
 ### Content + Embed
 
 ```ruby
@@ -146,36 +180,64 @@ Discord::Webhook.send(
 )
 ```
 
----
+## Security
 
-## Notes & Best Practices
+### Mention Protection
 
-- All webhook fields are optional
-- Embeds must be passed as `Array<Hash>`
-- Rich Presence runs in its own thread
-- Errors are silently handled to avoid crashes
-- Safe for game loops and real-time apps
+- Removes all `@` characters
+- Prevents:
+  - `@everyone`
+  - `@here`
+  - Role mentions
+  - User mentions
 
----
+Enabled by default on:
+- content
+- username
+- embed text
 
-## Platform Compatibility
 
-| OS      | Status                             |
-| ------- | ---------------------------------- |
-| Windows | ✅ Native IPC                      |
-| Linux   | ✅ `/run/user` / `XDG_RUNTIME_DIR` |
-| macOS   | ✅ `/tmp/discord-ipc-*`            |
+## Configuration Reference
+
+The embed section allows you to **have a default structure**, so you do not need to build embeds manually for each message.
+
+```json
+{
+  "client_id": "DISCORD_APP_ID",
+  "details": "Default details",
+  "state": "Default state",
+  "large_image": "large",
+  "small_image": "small",
+  "large_text": "Large hover",
+  "small_text": "Small hover",
+
+  "webhook_url": "WEBHOOK_URL",
+
+  "color": "#5865F2",
+  "title": "Default title",
+  "url": null,
+  "author_name": "Author",
+  "author_icon": null,
+  "author_url": null,
+  "thumbnail": null,
+  "description": "Default description",
+  "image": null,
+  "footer_text": "Footer",
+  "footer_icon": null
+}
+```
+
+> All fields are optional, except those marked as required by Discord. If you do not want them, set them to `null`. The default embed structure ensures you have a working format out-of-the-box without needing to manually define every field each time.
+
 
 ---
 
 ## License
 
-Free to use, modify, and distribute.  
-No warranty — use at your own risk.
-
----
+Free to use, modify and distribute.
 
 ## Credits
 
-Made with ❤️ for Pokémon SDK & Ruby projects.  
-Inspired by Discord IPC & Webhook APIs.
+Made with ❤️ for Pokémon SDK & Ruby projects.
+Inspired by Discord IPC & Webhook official APIs.
+

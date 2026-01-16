@@ -1,0 +1,23 @@
+{
+  "client_id": "YOUR_CLIENT_ID",
+  "details": "Placeholder details",
+  "state": "Placeholder state",
+  "large_image": "large",
+  "small_image": "small",
+  "large_text": "Placeholder large_text",
+  "small_text": "Placeholder small_text",
+
+  "webhook_url": "YOUR_WEBHOOK_URL",
+
+  "color": "#3A6CB5",
+  "title": "Placeholder title",
+  "url": null,
+  "author_name": "Placeholder author_name",
+  "author_icon": null,
+  "author_url": null,
+  "thumbnail": null,
+  "description": "Placeholder description",
+  "image": null,
+  "footer_icon": null,
+  "footer_text": "Placeholder footer_text"
+}

@@ -5,15 +5,26 @@ module Discord
     # =========================
     # Discord IPC Opcodes
     # =========================
+
+    # Opcode for handshake.
+    #
+    # @return [Integer]
     OPCODE_HANDSHAKE = 0
+
+    # Opcode for sending frames.
+    #
+    # @return [Integer]
     OPCODE_FRAME     = 1
 
-    # Discord Application ID
+    # Discord Application ID.
+    #
+    # @return [String]
     CLIENT_ID = Configs.discord.client_id
 
     # =========================
     # Internal State
     # =========================
+
     @mutex      = Mutex.new
     @thread     = nil
     @socket     = nil
@@ -22,25 +33,18 @@ module Discord
     @start_time = Time.now.to_i
     @activity   = {}
 
-    # Interval (seconds) between keep-alive pings
+    # Interval in seconds to send keep-alive pings.
+    #
+    # @return [Integer]
     KEEP_ALIVE_INTERVAL = 15
 
     # =========================
     # Public API
     # =========================
 
-    # Start Discord Rich Presence.
+    # Start the Rich Presence thread.
     #
     # @return [void]
-    #
-    # Side effects:
-    # - Opens Discord IPC connection
-    # - Spawns a background thread
-    # - Sends initial activity
-    #
-    # Notes:
-    # - Non-blocking
-    # - Safe to call multiple times
     def start
       @mutex.synchronize do
         return if @running
@@ -51,14 +55,9 @@ module Discord
       @thread = Thread.new { rpc_loop }
     end
 
-    # Stop Rich Presence entirely.
+    # Stop the Rich Presence thread and clear activity.
     #
     # @return [void]
-    #
-    # Side effects:
-    # - Clears Discord activity
-    # - Closes IPC socket
-    # - Kills background thread
     def stop
       @mutex.synchronize do
         @running = false
@@ -71,13 +70,9 @@ module Discord
       @thread = nil
     end
 
-    # Temporarily hide Rich Presence.
+    # Pause Rich Presence updates.
     #
     # @return [void]
-    #
-    # Side effects:
-    # - Clears Discord activity
-    # - Keeps IPC connection alive
     def pause
       @mutex.synchronize do
         return unless @running
@@ -88,12 +83,9 @@ module Discord
       clear_activity rescue nil
     end
 
-    # Restore Rich Presence after pause.
+    # Resume Rich Presence updates.
     #
     # @return [void]
-    #
-    # Side effects:
-    # - Re-sends last activity to Discord
     def resume
       @mutex.synchronize do
         return unless @running
@@ -104,33 +96,27 @@ module Discord
       send_activity rescue nil
     end
 
-    # Check pause state.
+    # Check if Rich Presence updates are paused.
     #
     # @return [Boolean]
     def paused?
       @paused
     end
 
-    # Update Rich Presence fields.
+    # =========================
+    # Activity Update
+    # =========================
+
+    # Update the current activity.
     #
-    # @param details [String, nil]
-    #   Primary activity text
-    #
-    # @param state [String, nil]
-    #   Secondary activity text
-    #
-    # @param assets [Hash, nil]
-    #   Asset overrides (large_image, small_image, etc.)
-    #
+    # @param details [String, :__keep__] The details text (leave unchanged with :__keep__).
+    # @param state [String, :__keep__] The state text (leave unchanged with :__keep__).
+    # @param assets [Hash, nil] Assets to merge into the activity.
     # @return [void]
-    #
-    # Notes:
-    # - Only provided fields are updated
-    # - Automatically sent unless paused
-    def update(details: nil, state: nil, assets: nil)
+    def update(details: :__keep__, state: :__keep__, assets: nil)
       @mutex.synchronize do
-        @activity[:details] = details if details
-        @activity[:state]   = state   if state
+        @activity[:details] = details unless details == :__keep__
+        @activity[:state]   = state   unless state   == :__keep__
 
         if assets
           @activity[:assets] ||= {}
@@ -145,14 +131,9 @@ module Discord
     # Main RPC Loop
     # =========================
 
-    # Background RPC loop.
+    # The main loop that maintains the IPC connection and sends keep-alive pings.
     #
     # @return [void]
-    #
-    # Internal:
-    # - Handles reconnects
-    # - Sends keep-alive pings
-    # - Silent error recovery
     def rpc_loop
       last_ping = Time.now.to_i
 
@@ -181,40 +162,56 @@ module Discord
     # Activity Handling
     # =========================
 
-    # Build activity from configuration.
+    # Build the initial Discord Rich Presence activity object.
     #
-    # @return [void]
+    # @return [Hash] The initialized activity hash.
     def build_initial_activity
       @activity = {
         details: Configs.discord.details,
         state:   Configs.discord.state,
         assets: {
           large_image: Configs.discord.large_image,
-          small_image: Configs.discord.small_image
+          large_text:  Configs.discord.large_text,
+          small_image: Configs.discord.small_image,
+          small_text:  Configs.discord.small_text
         }
       }
     end
 
-    # Send current activity to Discord.
+    # Remove nil keys recursively from a hash.
+    #
+    # @param hash [Hash] The hash to clean.
+    # @return [Hash] A new hash with nil values removed.
+    def compact_hash(hash)
+      hash.each_with_object({}) do |(k, v), h|
+        next if v.nil?
+        h[k] = v.is_a?(Hash) ? compact_hash(v) : v
+      end
+    end
+
+    # Send the current activity to Discord.
     #
     # @return [void]
     def send_activity
+      activity = compact_hash(
+        @activity.merge(
+          timestamps: { start: @start_time }
+        )
+      )
+
       payload = {
         cmd: "SET_ACTIVITY",
         nonce: rand(1_000_000).to_s,
         args: {
           pid: Process.pid,
-          activity: {
-            **@activity,
-            timestamps: { start: @start_time }
-          }
+          activity: activity
         }
       }
 
       send_packet(@socket, OPCODE_FRAME, payload)
     end
 
-    # Clear activity from Discord UI.
+    # Clear the current Discord activity.
     #
     # @return [void]
     def clear_activity
@@ -231,7 +228,7 @@ module Discord
     # IPC Core
     # =========================
 
-    # Perform IPC handshake.
+    # Connect to Discord IPC and perform handshake.
     #
     # @return [void]
     def connect_and_handshake
@@ -245,14 +242,14 @@ module Discord
       wait_ready(@socket)
     end
 
-    # Check socket state.
+    # Check if the IPC socket is connected.
     #
     # @return [Boolean]
     def connected?
       @socket && !@socket.closed?
     end
 
-    # Send keep-alive ping.
+    # Send a ping to Discord to keep the connection alive.
     #
     # @return [void]
     def send_ping
@@ -263,34 +260,34 @@ module Discord
     # Platform IPC Paths
     # =========================
 
-    # Open Discord IPC socket.
+    # Attempt to connect to the Discord IPC socket.
     #
-    # @return [File]
-    # @raise [RuntimeError] if IPC not found
+    # @return [IO, nil] The connected socket, or nil if none found.
     def connect
       ipc_paths.each do |path|
-        socket = File.open(path, "r+b")
-        socket.sync = true
-        return socket
-        
         begin
           case RUBY_PLATFORM
           when /mswin|mingw|cygwin/
-            return File.open(path, "r+b")
+            socket = File.open(path, "r+b")
           when /linux|darwin/
-            return UNIXSocket.new(path)
+            socket = UNIXSocket.new(path)
+          else
+            next
           end
+
+          socket.sync = true
+          return socket
         rescue
           next
         end
       end
 
-      return nil
+      nil
     end
 
-    # List IPC paths by platform.
+    # Generate potential IPC socket paths based on platform.
     #
-    # @return [Array<String>]
+    # @return [Array<String>] List of possible IPC paths.
     def ipc_paths
       case RUBY_PLATFORM
       when /mswin|mingw|cygwin/
@@ -300,15 +297,15 @@ module Discord
         paths = (0..9).map { |i| "/run/user/#{uid}/discord-ipc-#{i}" }
 
         if ENV["XDG_RUNTIME_DIR"]
-        paths += (0..9).map { |i| "#{ENV["XDG_RUNTIME_DIR"]}/discord-ipc-#{i}" }
+          paths += (0..9).map { |i| "#{ENV["XDG_RUNTIME_DIR"]}/discord-ipc-#{i}" }
         end
 
-        return paths
+        paths
       when /darwin/
         tmp = ENV["TMPDIR"] || "/tmp"
         (0..9).map { |i| File.join(tmp, "discord-ipc-#{i}") }
       else
-        return []
+        []
       end
     end
 
@@ -316,21 +313,21 @@ module Discord
     # Low-level IPC
     # =========================
 
-    # Wait for Discord READY payload.
+    # Wait for Discord to acknowledge the handshake.
     #
-    # @param socket [File]
-    # @return [Hash]
+    # @param socket [IO] The IPC socket.
+    # @return [Hash] Parsed JSON response.
     def wait_ready(socket)
       header = socket.read(8)
       _, len = header.unpack("L<L<")
       JSON.parse(socket.read(len))
     end
 
-    # Send raw IPC packet.
+    # Send a packet to Discord via the IPC socket.
     #
-    # @param socket [File]
-    # @param opcode [Integer]
-    # @param data [Hash]
+    # @param socket [IO] The IPC socket.
+    # @param opcode [Integer] The Discord IPC opcode.
+    # @param data [Hash] The payload to send.
     # @return [void]
     def send_packet(socket, opcode, data)
       return unless socket && !socket.closed?
@@ -341,7 +338,7 @@ module Discord
       socket.write(json)
     end
 
-    # Close IPC socket.
+    # Close the IPC socket if open.
     #
     # @return [void]
     def close_socket
