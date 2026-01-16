@@ -1,3 +1,5 @@
+require "time"
+
 module Discord
   module Webhook
     module_function
@@ -5,6 +7,15 @@ module Discord
     # =========================
     # Utils
     # =========================
+
+    # Prevent Discord mentions (@everyone, roles, users) in a string.
+    #
+    # @param value [String] The string to sanitize.
+    # @return [String]
+    def sanitize_mentions(value)
+      return value unless value.is_a?(String)
+      value.gsub("@", "")
+    end
 
     # Remove nil values recursively from a Hash or Array.
     #
@@ -250,15 +261,6 @@ module Discord
         return if value.nil?
         return value if value.is_a?(Integer)
         value.to_s.delete("#").to_i(16)
-      end
-
-      # Prevent Discord mentions (@everyone, roles, users) in a string.
-      #
-      # @param value [String] The string to sanitize.
-      # @return [String]
-      def sanitize_mentions(value)
-        return value unless value.is_a?(String)
-        value.gsub("@", "")
       end
     end
   end
