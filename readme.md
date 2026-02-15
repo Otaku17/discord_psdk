@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://cdn.discordapp.com/attachments/1457770649970802779/1472596616438612078/logo_github.png?ex=699325f8&is=6991d478&hm=f51643db05c10dfc41b2a3a125e1e46fba6ee140126b4f390c6b3a3665081a61&" width="300">
+</p>
+
 # Discord Integration (Rich Presence & Webhook)
 
 > Discord integration for Ruby / Pokémon SDK projects  
