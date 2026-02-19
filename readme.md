@@ -10,19 +10,21 @@
 
 ## Installation / Update
 
-1. Place the plugin in your project/scripts:
+0. Download [Discord.psdkplug](https://github.com/Otaku17/discord_psdk/releases)
+
+2. Place the plugin in your project/scripts:
 
    ```
    Discord.psdkplug
    ```
 
-2. Run this command at the root of your project:
+3. Run this command at the root of your project:
 
    ```bash
    .\psdk --util=plugin load
    ```
 
-3. Configure Discord settings (`Data/configs/discord_config.json`).
+4. Configure Discord settings (`Data/configs/discord_config.json`).
 
 Here’s an example of a typical Rich Presence activity setup:
 
