@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cdn.discordapp.com/attachments/1457770649970802779/1472596616438612078/logo_github.png?ex=699325f8&is=6991d478&hm=f51643db05c10dfc41b2a3a125e1e46fba6ee140126b4f390c6b3a3665081a61&" width="300">
+  <img src="https://cdn.discordapp.com/attachments/1015276970625466474/1499740699493404672/pwa-512.png?ex=69f5e5de&is=69f4945e&hm=7be959182dd4de4f0ce5a6db9b29bc2f9abb4caea7a342469fe6b9b7efb9c759&" width="300">
 </p>
 
 # Discord Integration (Rich Presence & Webhook)
